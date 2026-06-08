@@ -73,7 +73,7 @@ except Exception as e:
 else:
     logger.info("Callbook successfully loaded.")
     callbook.drop(
-        columns=["SUFIXUL", "E-MAIL", "DATA LIMITA A REZERVARII"], inplace=True
+        columns=["SUFIXUL", "E-MAIL"], inplace=True
     )
 
 # Load POTA database
@@ -452,7 +452,7 @@ async def get_WWBOTA_command(
         else:
             for index, row in df.iterrows():
                 logger.info("Sending message...")
-                timestamp = getTime(row["time"])
+                timestamp = row["timestamp"]
                 activator = row["call"]
                 comment = row["comment"]
                 ref = row["reference"]
@@ -617,6 +617,7 @@ async def callsign_info_command(
                 cls = row["CLASA"]
                 loc = row["LOCALITATEA"]
                 exp = row["DATA EXPIRARII"]
+                res = row["DATA LIMITA A REZERVARII"]
                 url = "https://www.ancom.ro/radioamatori_2899"
 
                 try:
@@ -625,6 +626,7 @@ async def callsign_info_command(
                         f"Class: <b>{cls}</b>\n"
                         f"Location: <b>{loc}</b>\n"
                         f"Expiration date: <b>{exp}</b>\n"
+                        f"Reservation limit: <b>{res}</b>\n"
                         f"Source: <a href='{url}'><b>ANCOM</b></a>",
                         parse_mode="HTML",
                     )
@@ -752,7 +754,9 @@ async def auto_spot(app):
     sent = False
 
     try:
-        _, df = dc.centralisePOTA()
+        ok, df = dc.centralisePOTA()
+        if not ok:
+            raise ValueError("centralisePOTA failed")
         flt = os.getenv("AUTO_SPOT")
         if flt:
             flt = flt.split()
@@ -853,7 +857,9 @@ async def auto_spot(app):
     sent = False
 
     try:
-        _, df = dc.centraliseSOTA()
+        ok, df = dc.centraliseSOTA()
+        if not ok:
+            raise ValueError("centraliseSOTA failed")
         flt = os.getenv("AUTO_SPOT")
         if flt:
             flt = flt.split()

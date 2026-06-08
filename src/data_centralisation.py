@@ -151,29 +151,31 @@ def centraliseWWBOTA():
     data = fetchData(url)
     df = pd.DataFrame
 
-    if data:
-        logger.info("Fetching successful, building DataFrame")
-
-        # Construction of DataFrame
-        df = pd.DataFrame(data)
-        df.drop(["spotter"], axis=1, inplace=True)
-        df["reference"] = df["references"].apply(
-            lambda refs: refs[0]["reference"] if refs else None
-        )
-        df.drop("references", axis=1, inplace=True)
-        # Convert 'time' to timestamp tuple (date, time) for compatibility
-        df["timestamp"] = df["time"].apply(
-            lambda t: (t.split("T")[0], t.split("T")[1].split(".")[0])
-            if t
-            else ("", "")
-        )
-        df.drop("time", axis=1, inplace=True)
-        df.drop_duplicates(inplace=True)
-
-        logger.info("Operation complete.")
-        return (1, df)
-    else:
+    if data is None:
         return (0, df)
+
+    if not data:
+        logger.info("No WWBOTA spots active.")
+        return (1, pd.DataFrame())
+
+    logger.info("Fetching successful, building DataFrame")
+
+    df = pd.DataFrame(data)
+    df.drop(["spotter"], axis=1, inplace=True, errors="ignore")
+    df["reference"] = df["references"].apply(
+        lambda refs: refs[0]["reference"] if refs else None
+    )
+    df.drop("references", axis=1, inplace=True)
+    df["timestamp"] = df["time"].apply(
+        lambda t: (t.split("T")[0], t.split("T")[1].split(".")[0])
+        if t
+        else ("", "")
+    )
+    df.drop("time", axis=1, inplace=True)
+    df.drop_duplicates(inplace=True)
+
+    logger.info("Operation complete.")
+    return (1, df)
 
 
 def centraliseBOTA(url):
@@ -248,43 +250,47 @@ def centraliseLLOTA(url):
     data = fetchData(url)
     df = pd.DataFrame
 
-    if data:
-        logger.info("Fetching successful, building DataFrame...")
-
-        df = pd.DataFrame(data)
-
-        def parse_history(history_list):
-            if isinstance(history_list, list) and history_list:
-                try:
-                    most_recent = sorted(
-                        history_list, key=lambda x: x.get("timestamp", ""), reverse=True
-                    )[0]
-                    return most_recent.get("comment"), most_recent.get("timestamp")
-                except Exception:
-                    pass
-            return None, None
-
-        extracted = df["history"].apply(lambda x: pd.Series(parse_history(x)))
-        df["comment"] = extracted[0]
-        df["timestamp"] = extracted[1]
-
-        keep_cols = [
-            "callsign",
-            "frequency",
-            "mode",
-            "reference",
-            "reference_name",
-            "country_name",
-            "comment",
-            "timestamp",
-        ]
-
-        existing_cols = [col for col in keep_cols if col in df.columns]
-        df = df[existing_cols]
-
-        df.drop_duplicates(inplace=True)
-        logger.info("Operation complete.")
-        return (1, df)
-    else:
+    if data is None:
         logger.error("Failed to fetch data.")
         return (0, df)
+
+    if not data:
+        logger.info("No LLOTA spots active.")
+        return (1, pd.DataFrame())
+
+    logger.info("Fetching successful, building DataFrame...")
+
+    df = pd.DataFrame(data)
+
+    def parse_history(history_list):
+        if isinstance(history_list, list) and history_list:
+            try:
+                most_recent = sorted(
+                    history_list, key=lambda x: x.get("timestamp", ""), reverse=True
+                )[0]
+                return most_recent.get("comment"), most_recent.get("timestamp")
+            except Exception:
+                pass
+        return None, None
+
+    extracted = df["history"].apply(lambda x: pd.Series(parse_history(x)))
+    df["comment"] = extracted[0]
+    df["timestamp"] = extracted[1]
+
+    keep_cols = [
+        "callsign",
+        "frequency",
+        "mode",
+        "reference",
+        "reference_name",
+        "country_name",
+        "comment",
+        "timestamp",
+    ]
+
+    existing_cols = [col for col in keep_cols if col in df.columns]
+    df = df[existing_cols]
+
+    df.drop_duplicates(inplace=True)
+    logger.info("Operation complete.")
+    return (1, df)
